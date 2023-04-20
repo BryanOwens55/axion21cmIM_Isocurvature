@@ -101,7 +101,7 @@ root = directory + '/' + survey_name
 
 # Define redshift bins
 if verbos >= 1 and myid == 0: print('Defining redshift bins...')
-zs, zc = rf.zbins_const_dz(expt, dz=0.05)
+zs, zc = rf.zbins_const_dz(expt, dz=0.05) #
 if verbos >= 1 and myid == 0: print('Number of redshift bins = %i' % len(zs))
 if verbos >= 1 and myid == 0: print('Done.')
 
@@ -121,71 +121,115 @@ if verbos >= 1 and myid == 0:
     print('Loop through redshift bins, assigning them to each process')
     print('#' * 50)
 
-Fisher = []
-for i in range(zs.size - 1):
-    if i % size != myid:
-        continue
-    print(">>> %2d working on redshift bin %2d -- z = %3.5f" % (myid, i, zc[i]))
-    # Add z to cosmological library in order to pass this value to axionCAMB input
-    cosmo_dic['z'] = zc[i]
+i=0
 
-    # Set filename of fiducial parameters for cached power spectrum dictionary.
-    fname_PS = 'PS_dictionaries/cache_powerspec_ma{}_fiducial-axfrac{}_z{}.npy'.format(cosmo_dic['ma'],
-                                                                                       cosmo_dic['axion_fraction'],
-                                                                                       zc[i])
-    
-    from fisher_derivs import fisher_Cl
-    # Calculate basic Fisher matrix for C_ell
+print(">>> %2d working on redshift bin %2d -- z = %3.5f" % (myid, i, zc[i]))
+# Add z to cosmological library in order to pass this value to axionCAMB input
+cosmo_dic['z'] = zc[i]
+
+# Set filename of fiducial parameters for cached power spectrum dictionary.
+fname_PS = 'PS_dictionaries/cache_powerspec_ma{}_fiducial-axfrac{}_z{}.npy'.format(cosmo_dic['ma'],
+                                                                                    cosmo_dic['axion_fraction'],
+                                                                                    zc[i])
+
+# Calculate basic Fisher matrix for C_ell
+
+for key, value in cosmo_dic.items() :
+    print (key)
+
+
+lst_powerspec = []
+lst_powerspec2 = []
+lst3 = []
+
+num = 1
+for j in range(num):
+
+    print('\n\n\n')
+    print(str(round(j/num*100)) + '%')
+    print('\n\n\n')
+
     if verbos >= 1: print('Calculate Fisher matrix for C_ell.')
     '''
     F, paramnames, deltacl_arr, Cl, ell_arr, derivs, powerspec_dic, k, P_HI = rf.fisher_Cl(zmin=zs[i], zmax=zs[i + 1], cosmo=cosmo_dic, expt=expt,
                                                            cachefile=fname_PS, analysis_specifications=analysis_dic,
-                                                           survey_name=survey_name.replace(EXPT_LABEL, ''))
+                                                            survey_name=survey_name.replace(EXPT_LABEL, ''))
     '''
-    F, paramnames, deltacl_arr, Cl, ell_arr, derivs = fisher_Cl(zmin=zs[i], zmax=zs[i + 1], cosmo=cosmo_dic, expt=expt,
+
+    from fisher_P_HI import fisher_Cl
+    cosmo_dic['z'] = 0.0
+    F, paramnames, deltacl_arr, Cl, ell_arr, derivs, powerspec_dic, k, P_HI = fisher_Cl(0.0,0.001, cosmo=cosmo_dic, expt=expt,
                                                            cachefile=fname_PS, analysis_specifications=analysis_dic,
-                                                           survey_name=survey_name.replace(EXPT_LABEL, ''))
+                                                            survey_name=survey_name.replace(EXPT_LABEL, ''))
 
 
-    if i == 0:
-        Fisher = F
-    else:
-        Fisher += F
-        
-    print('\n\n\n Fisher Matrix:', F, '\n')
-    print('\n\n\n Fisher Matrix:', Fisher, '\n')
-        
-    # Save Fisher matrix and k bins
 
-    if verbos >= 1: print('Save diagonal of Fisher matrix and Delta C_ell and N_ell.')
-    
-    np.savetxt(root + "-deltacl_%i.dat" % i, deltacl_arr)
-    np.savetxt(root + "-Cl_%i,%2d.dat" % (i,zc[i]), Cl)
-    np.savetxt('output/derivs/' + "derivs_%i,%3.5f.dat" % (i,zc[i]), np.transpose(derivs), header=" ".join(paramnames))
-    #np.savetxt('output/PS/' + "PS_tot_%i,%3.5f.dat" % (i,zc[i]), np.transpose(powerspec_dic['PS_total']))
-    #np.savetxt('output/PS/' + "PS_%i,%3.5f.dat" % (i,zc[i]), np.transpose(powerspec_dic['PS_axion+baryon+CDM']))
-    #np.savetxt('output/PS/' + "k_%i,%3.5f.dat" % (i,zc[i]), np.transpose(powerspec_dic['k']))
+    lst_powerspec.append(powerspec_dic['PS_total'])
+    lst_powerspec2.append(powerspec_dic['PS_axion+baryon+CDM'])
+    lst3.append(P_HI)
+lst3.append(k)
 
+# Save Fisher matrix and k bins
 
-    #PS_total
-    '''
-    print('\n\n\n')
-    for key, value in powerspec_dic.items() :
-        print (key)
-    print('\n\n\n')
-    '''
+'''
+if verbos >= 1: print('Save diagonal of Fisher matrix and Delta C_ell and N_ell.')
+np.savetxt(root + "-fisher-Cl-full_%d.dat" % i, F, header=" ".join(paramnames))
+np.savetxt(root + "-deltacl_%i.dat" % i, deltacl_arr)
+np.savetxt(root + "-Cl_%i,%2d.dat" % (i,zc[i]), Cl)
+np.savetxt('output/derivs/' + "derivs_%i,%3.5f.dat" % (i,zc[i]), np.transpose(derivs), header=" ".join(paramnames))
+np.savetxt('output/PS/' + "PS_tot_%i,%3.5f.dat" % (i,zc[i]), np.transpose(powerspec_dic['PS_total']))
+np.savetxt('output/PS/' + "PS_%i,%3.5f.dat" % (i,zc[i]), np.transpose(powerspec_dic['PS_axion+baryon+CDM']))
+np.savetxt('output/PS/' + "k_%i,%3.5f.dat" % (i,zc[i]), np.transpose(powerspec_dic['k']))
+'''
+
+np.savetxt('output/powerspecs/' + "PS_%i,%3.5f.dat" % (i,zc[i]), np.transpose(lst_powerspec))
+np.savetxt('output/powerspecs/' + "PS_2_%i,%3.5f.dat" % (i,zc[i]), np.transpose(lst_powerspec2))
+np.savetxt('output/powerspecs/' + "P_HI%i.dat" % (cosmo_dic['ma']), np.transpose(lst3))
+
+#PS_total
 
 
-    if myid == 0:
-        if verbos >= 1: print('... and save center of k bins.')
-        np.savetxt(root + "-ell.dat", ell_arr)
-        np.savetxt(root + "-redshift_%i.dat" % i, zc)
-
-    if verbos >= 1: print(">>> %2d finished redshift bin %2d -- z = %3.3f" % (myid, i, zc[i]))
-    del F, paramnames, deltacl_arr, ell_arr
 
 
-np.savetxt(root + "-fisher-Cumulative_Fisher.dat", Fisher)
+if myid == 0:
+    if verbos >= 1: print('... and save center of k bins.')
+    np.savetxt(root + "-ell.dat", ell_arr)
+    np.savetxt(root + "-redshift_%i.dat" % i, zc)
+
+if verbos >= 1: print(">>> %2d finished redshift bin %2d -- z = %3.3f" % (myid, i, zc[i]))
+del F, paramnames, deltacl_arr, ell_arr
 
 comm.barrier()
 if myid == 0: print("Finished.")
+
+
+'''
+k
+transfer_total
+growth_rate
+transfer_CDM
+transfer_baryon
+transfer_axion
+transfer_massless-neutrino
+transfer_massive-neutrino
+transfer_axion+baryon+CDM
+PS_axion+baryon+CDM
+PS_total
+omega_bh2
+omega_ch2
+omega_nuh2
+omega_k
+hubble
+omega_axh2
+k_pivot
+initial_amplitude
+scalar_index
+transfer_kmax
+transfer_interp_matterpower
+z
+transfer_filename
+matterpower_filename
+number_of_k_values
+omega_axion+baryon+CDM_0
+hash
+'''
