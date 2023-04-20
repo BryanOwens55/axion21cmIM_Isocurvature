@@ -1,4 +1,4 @@
-****21cm Intenstiy Mapping with axionCAMB****
+****21cm Intenstiy Mapping with axionCAMB With the inclusion of Isocurvature****
 
 This code calculates the Fisher matrices for a given 21cm intensity mapping experiment, including the axion fraction as forecasted parameter. Its general structure is based on the [bao21cm](https://gitlab.com/radio-fisher/bao21cm) code from [Bull et al. (2015)](https://arxiv.org/abs/1405.1452), though it differs conceptionally in calculating the angular power spectra, instead of comoving power spectrum in the flat sky limit.
 
@@ -18,6 +18,11 @@ If you find any bugs, have any questions with respect to the code, please contac
 
 ![codesketch](sketch/code_sketch.png)
 
+
+**ISOCURVATURE ADDITION**
+
+This code requires the use of axionCAMB to run, make sure to change the location of the directory to axionCAMB in the full_experiment_infile files to be able to run.
+For this code there are two experiment files, full_experiemnet specific will only run and return the power spectrum of neutral hydrogen. To get the derivativs and Fisher matrix run the non-specific experiment file. Lastly, there are three example input files that can be used and modified as see fit.
 
 
 
