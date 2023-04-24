@@ -39,6 +39,12 @@ def load_cosmology_input(file):
             cosmo_dic['axion_fraction'] = eval(line[1].strip())
         elif line[0].strip() == 'omega_d_0':
             cosmo_dic['omega_d_0'] = eval(line[1].strip())
+        elif line[0].strip() == 'alpha_frac':
+            cosmo_dic['alpha_frac'] = eval(line[1].strip())
+        elif line[0].strip() == 'Hinf':
+            cosmo_dic['Hinf'] = eval(line[1].strip())
+        elif line[0].strip() == 'axion_isocurvature':
+            cosmo_dic['axion_isocurvature'] = eval(line[1].strip())
         elif line[0].split()[0] == '#':
             continue
         else:

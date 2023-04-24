@@ -17,7 +17,6 @@ INF_NOISE = 1e200 # Very large finite no. used to denote infinite noise
 
 # Location of CAMB executable
 CAMB_EXEC = '/home/bryan/axionCAMB/axionCAMB/'
-#CAMB_EXEC = '/home/jurek/Dropbox/axionCAMB'
 # CAMB_EXEC = '/usr/users/jbauer5/bin/axionCAMB'
 
 
@@ -33,7 +32,6 @@ def window_function(z, z_min, z_max):
 def Cl_signal(ell, z, z_min, z_max, cosmo, cachefile, analysis_specifications):
     '''
     Computes C_\ell, given an array of ell values and redshift bin [z_min, z_max].
-
     ell: array of ell values; default from 1 to 1000
     z_min: minimum redshift of redshift bin
     z_max: maximum redshift of redshift bin
@@ -48,7 +46,6 @@ def Cl_signal(ell, z, z_min, z_max, cosmo, cachefile, analysis_specifications):
     rr = comoving_distance(z=z, om_m=get_omega_M(cosmo=cosmo))
     # Effective k_arr in h/Mpc
     k = (ell + 0.5) / rr
-    k = np.linspace(1e-3, 1e1, len(ell))
     # Load power spectrum dictionary from axionCAMB
     powerspec_dic = load_power_spectrum(cosmo=cosmo, analysis_specifications=analysis_specifications,
                                         cachefile=cachefile,
@@ -81,7 +78,7 @@ def Cl_signal(ell, z, z_min, z_max, cosmo, cachefile, analysis_specifications):
         plt.title(r'$z = %.4f$' % z)
         plt.legend()
         plt.show()
-    return prefactor * P_HI, powerspec_dic, k, P_HI
+    return prefactor * P_HI
 
 
 def load_interferom_file(fname):
@@ -96,7 +93,6 @@ def load_interferom_file(fname):
 def Nl_noise(ell, z_min, z_max, expt, cosmo, analysis_specifications):
     '''
     Computes N_\ell (dimensionless) for the given survey specifications in dictionary expt.
-
     ell:            Array of ell
     z_min:          Minimum redshift of redshift bin
     z_max:          Maximum redshift of redshift bin
@@ -212,13 +208,11 @@ def deriv_wrapper(ell_arr, zmin, zmax, cosmo, analysis_specifications, deriv_opt
                   Delta_As=1.0e-13,
                   Delta_ns=0.0005,
                   Delta_vc0=0.01,
-                  Delta_beta=0.003,
-                  Delta_alpha = 0.001):
+                  Delta_beta=0.003):
     '''
     Returns the numerically calculated derivative of C_ell wrt to some model parameter
     (units depending on model parameter).
     Could probably modularize and functionalize this function to shorten up the code.
-
     ell_arr:            Array of ell's
     zmin:               Minimum redshift in redshift bin
     zmax:               Maximum redshift in redshift bin
@@ -229,10 +223,10 @@ def deriv_wrapper(ell_arr, zmin, zmax, cosmo, analysis_specifications, deriv_opt
     '''
 
     def return_derivative(cosmo_minus, cosmo_plus, cachefile_minus, cachefile_plus, Delta):
-        Cl_minus, powerspec_dic, k, P_HI = Cl_signal(ell_arr, z=z, z_min=zmin, z_max=zmax,
+        Cl_minus = Cl_signal(ell_arr, z=z, z_min=zmin, z_max=zmax,
                              cosmo=cosmo_minus, cachefile=cachefile_minus,
                              analysis_specifications=analysis_specifications)
-        Cl_plus, powerspec_dic, k, P_HI = Cl_signal(ell_arr, z=z, z_min=zmin, z_max=zmax,
+        Cl_plus = Cl_signal(ell_arr, z=z, z_min=zmin, z_max=zmax,
                             cosmo=cosmo_plus, cachefile=cachefile_plus,
                             analysis_specifications=analysis_specifications)
         return (Cl_plus - Cl_minus) / (2.0 * Delta), Delta
@@ -307,15 +301,6 @@ def deriv_wrapper(ell_arr, zmin, zmax, cosmo, analysis_specifications, deriv_opt
         cosmo_betaminus['HI_halo_formula_args']['beta'] -= Delta_beta
         return return_derivative(cosmo_minus=cosmo_betaminus, cosmo_plus=cosmo_betaplus,
                                  cachefile_minus=cachefile_fid, cachefile_plus=cachefile_fid, Delta=Delta_beta)
-    elif deriv_opt == 'alpha':
-        cosmo_alphaplus = copy.deepcopy(cosmo)
-        cosmo_alphaminus = copy.deepcopy(cosmo)
-        cosmo_alphaplus['alpha_ax'] += Delta_alpha
-        cosmo_alphaminus['alpha_ax'] -= Delta_alpha
-        cachefile_plus = file_base + 'alphaplus_Delta{}_z{}.npy'.format(Delta_alpha, z)
-        cachefile_minus = file_base + 'alphaminus_Delta{}_z{}.npy'.format(Delta_alpha, z)
-        return return_derivative(cosmo_minus=cosmo_alphaminus, cosmo_plus=cosmo_alphaplus,
-                                 cachefile_minus=cachefile_minus, cachefile_plus=cachefile_plus, Delta=Delta_alpha)
     else:
         print(
             'deriv_wrapper_numerically(): You specified a derivative option %r, which is not yet implemented (or it is a typo?).' % deriv_opt)
@@ -327,7 +312,6 @@ def fisher_integrands(ell_arr, zmin, zmax, cosmo, expt, cachefile, analysis_spec
     Calculate derivatives of all parameters for the Fisher matrix and for all ell.
     Return list of arrays of these derivatives.
     Order: ln(As), ns, omega_b, omega_d, axfrac, h, vc0, beta
-
     ell_arr:        Array of ell
     zmin:           Minimum redshift for redshift bin
     zmax:           Maximum redshift for redshift bin
@@ -342,7 +326,7 @@ def fisher_integrands(ell_arr, zmin, zmax, cosmo, expt, cachefile, analysis_spec
         paramnames           List of parameter names to which the derivatives are taken (same order as deriv_list, obviously).f
     '''
     print('fisher_integrands(): Calculating C_ell and N_ell...')
-    Cl, powerspec_dic, k, P_HI = Cl_signal(ell_arr, z=0.5 * (zmin + zmax), z_min=zmin, z_max=zmax, cosmo=cosmo, cachefile=cachefile,
+    Cl = Cl_signal(ell_arr, z=0.5 * (zmin + zmax), z_min=zmin, z_max=zmax, cosmo=cosmo, cachefile=cachefile,
                    analysis_specifications=analysis_specifications)
 
     Nl = Nl_noise(ell_arr, z_min=zmin, z_max=zmax, expt=expt, cosmo=cosmo,
@@ -376,12 +360,6 @@ def fisher_integrands(ell_arr, zmin, zmax, cosmo, expt, cachefile, analysis_spec
     deriv_h, delta_h = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
                                      analysis_specifications=analysis_specifications, cosmo=cosmo,
                                      deriv_opt='hubble', cachefile_fid=cachefile)
-    '''
-    print('fisher_integrands(): Calculating derivative wrt to **alpha** numerically...')
-    deriv_alpha, delta_alpha = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                     analysis_specifications=analysis_specifications, cosmo=cosmo,
-                                     deriv_opt='alpha', cachefile_fid=cachefile)
-    '''
     if cosmo['HI_halo_formula'] == 'PRA2017':
         print('fisher_integrands(): Calculating derivative wrt to **vc0** numerically...')
         deriv_vc0, delta_vc0 = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
@@ -398,9 +376,8 @@ def fisher_integrands(ell_arr, zmin, zmax, cosmo, expt, cachefile, analysis_spec
                       deriv_axfrac,
                       deriv_h,
                       deriv_vc0,
-                      deriv_beta,
-                      ]
-        paramnames = ['ln_As', 'ns', 'omega_b_0', 'omega_d_0', 'axfrac', 'h', 'vc0', 'beta', 'alpha']
+                      deriv_beta]
+        paramnames = ['ln_As', 'ns', 'omega_b_0', 'omega_d_0', 'axfrac', 'h', 'vc0', 'beta']
     else:
         print('fisher_integrands(): You specified a HI halo mass relation which isn\'t implemendet for \
         calculating the derivatives yet. Will assume fixed HI halo mass relation.')
@@ -411,7 +388,7 @@ def fisher_integrands(ell_arr, zmin, zmax, cosmo, expt, cachefile, analysis_spec
                       deriv_axfrac,
                       deriv_h]
         paramnames = ['ln_As', 'ns', 'omega_b_0', 'omega_d_0', 'axfrac', 'h']
-    return DeltaCl_squared, Cl, deriv_list, paramnames, powerspec_dic, k, P_HI
+    return DeltaCl_squared, Cl, deriv_list, paramnames
 
 
 def integrate_fisher_elements(derivs, DeltaCl_squared_arr):
@@ -439,16 +416,12 @@ def integrate_fisher_elements(derivs, DeltaCl_squared_arr):
 def fisher_Cl(zmin, zmax, cosmo, expt, cachefile, analysis_specifications, survey_name=''):
     """
     Return Fisher matrix (and C_ell with errors) for given fiducial cosmology and experimental settings.
-
     Parameters
     ----------
-
     zmin, zmax : float
         Redshift window of survey
-
     cosmo : dict
         Dictionary of fiducial cosmological parameters
-
     expt : dict
         Dictionary of experimental parameters
     cachefile : str
@@ -457,13 +430,10 @@ def fisher_Cl(zmin, zmax, cosmo, expt, cachefile, analysis_specifications, surve
         Dictionary with analysis specifications necessary for calculating the Fisher matrix.
     survey_name : str
         Name of the survey. Passed to this function if one wants to plot something with that info on it.
-
     Returns
     -------
-
     F : array_like (2D)
         Fisher matrix for the parameters.
-
     """
     print('Survey: %s' % survey_name)
     # Copy, to make sure we don't modify input expt or cosmo
@@ -484,14 +454,14 @@ def fisher_Cl(zmin, zmax, cosmo, expt, cachefile, analysis_specifications, surve
         print("\tWARNING: Calculated P(k,z) from axionCAMB goes up to %3.2f h/Mpc, but maximum l/r(z) is %3.2f h/Mpc." %
               (analysis_specifications['CAMB_kmax'], np.max(ell_arr) / rr))
     # Calculate Delta C_ell and the derivatives wrt to the parameters
-    deltacl_arr, Cl, derivs, paramnames, powerspec_dic, k, P_HI = fisher_integrands(ell_arr=ell_arr, zmin=zmin, zmax=zmax, cosmo=cosmo,
+    deltacl_arr, Cl, derivs, paramnames = fisher_integrands(ell_arr=ell_arr, zmin=zmin, zmax=zmax, cosmo=cosmo,
                                                             expt=expt,
                                                             cachefile=cachefile,
                                                             analysis_specifications=analysis_specifications)
     print('Done.')
     F = integrate_fisher_elements(derivs=derivs, DeltaCl_squared_arr=deltacl_arr)
     # Return results
-    return F, paramnames, deltacl_arr, Cl, ell_arr, derivs, powerspec_dic, k, P_HI
+    return F, paramnames, deltacl_arr, Cl, ell_arr, derivs
 
 
 def load_power_spectrum(cosmo, analysis_specifications, cachefile,
@@ -499,17 +469,14 @@ def load_power_spectrum(cosmo, analysis_specifications, cachefile,
     """
     Load power spectrum from cachefile and return dictionary with powerspectrum, different transfer functions and other
     axionCAMB output information.
-
     Parameters
     ----------
-
     cosmo : dict
         Dictionary of cosmological parameters
     analysis_specifications: dict
         Dictionary of analysis specifications
     cachefile : string
         Path to a cached CAMB matter powerspectrum output file.
-
     Returns
     -------
     powerspec_dic: Dictionary of important axionCAMB output
@@ -528,7 +495,6 @@ def load_power_spectrum(cosmo, analysis_specifications, cachefile,
         p['massless_neutrinos'] = 2.046
         p['massive_neutrinos'] = '1'  # "2 1"
         p['nu_mass_eigenstates'] = 1
-    
 
     print("\tload_power_spectrum(): Loading matter P(k)...")
     powerspec_dic = cached_camb_output(p=p, cachefile=cachefile, cosmo=cosmo,
@@ -543,7 +509,6 @@ def mean_brightness_temperature(z, cosmo_dic, formula=''):
     """
     Brightness temperature Tb(z), in mK. Several different expressions for the
     21cm line brightness temperature are available:
-
      * 'santos': obtained using a simple power-law fit to Mario's data.
        (Best-fit Tb: 0.1376)
      * 'powerlaw': simple power-law fit to Mario's updated data (powerlaw M_HI
@@ -683,7 +648,6 @@ def cached_camb_output(p, cachefile, cosmo,
     powerspec_dic['transfer_axion'] = (1-alpha) * powerspec_dic['transfer_axion'] + alpha * powerspec_dic2['transfer_axion']
     powerspec_dic['transfer_axion+baryon+CDM'] = (1-alpha) * powerspec_dic['transfer_axion+baryon+CDM'] + alpha * powerspec_dic2['transfer_axion+baryon+CDM']
 
-    
     # Save data to file, adding hash to library
     if verbos >= 1: print(
         '\tcached_camb_output(): Saving powerspec_dictionary to %s including the hash for identification.\n'
@@ -712,8 +676,6 @@ def convert_to_camb(cosmo):
     p['pivot_scalar'] = cosmo['k_piv']
     p['omaxh2'] = get_omega_ax(cosmo=cosmo) * cosmo['h'] ** 2. + 1e-10  # +1e-10 to make sure to have a non-zero value
     p['m_ax'] = 10.0 ** cosmo['ma']
-    #p['axion_isocurvature'] = cosmo['axion_isocurvature']
-    p['Hinf'] = cosmo['Hinf']
     p['alpha_ax'] = cosmo['alpha_ax']
     return p
 
@@ -770,7 +732,6 @@ def zbins_const_dz(expt, dz=None):
     bins.
     """
     # Get redshift range
-    print('\n\n' + str(expt['nu_line']) + ', ' + str(expt['survey_numax']) + '\n\n')
     zmin = expt['nu_line'] / expt['survey_numax'] - 1.
     zmax = expt['nu_line'] / (expt['survey_numax'] - expt['survey_dnutot']) - 1.
 

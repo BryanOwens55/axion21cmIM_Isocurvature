@@ -60,6 +60,7 @@ def camb_params(params_fname,
     """
     Define a dictionary of all parameters in CAMB, set to their default values.
     """
+    
     # Get dict. of arguments 
     args = locals()
 
@@ -79,15 +80,50 @@ def camb_params(params_fname,
     f.close()
 
 
-def run_camb(params_fname, camb_exec_dir):
+def run_camb(params_fname, camb_exec_dir, params_fname2=''):
     """
     Run (axion)CAMB, using a given (pre-written) params file (see camb_params). Waits
     for (axion)CAMB to finish before returning. Returns a dictionary of derived values
     output by CAMB to stdout.
     """
+
+
+
     # Change directory and call CAMB
     cwd = os.getcwd()
     os.chdir(camb_exec_dir)
+
+    
+    #run isocurvature version
+    params_path2 = cwd + "/paramfiles/" + params_fname2
+    print("Running CAMB on", params_path2)
+    output2 = subprocess.check_output(["./camb", params_path2]).decode(sys.stdout.encoding)
+    print('-' * 25 + ' axionCAMB Isocurvature output ' + '-' * 25)
+    print(output2)
+    print('-' * 50)
+    # Capture on-screen output of derived parameters
+    vals2 = {}
+    for line in output2.split("\n"):
+        # Special cases: sigma8 and tau_recomb
+        if "sigma8" in line:
+            s8line2 = line[line.find('sigma8'):]  # Only get sigma8 part of string
+            match_number = re.compile('-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?')
+            vals2['sigma8'] = float(re.findall(match_number, s8line2)[1])
+        elif "tau_recomb" in line:
+            tau2 = re.findall(r'\b\d+.\d+\b', line)
+            vals2['tau_recomb/Mpc'] = float(tau2[0])
+            vals2['tau_now/Mpc'] = float(tau2[1])
+        elif "z_EQ" in line:
+            vals2['z_EQ'] = float(re.findall(r'\b\d+.\d+\b', line)[0])
+        else:
+            # All other params can just be stuffed into a dictionary
+            try:
+                key2, val2 = line.split("=")
+                vals2[key.strip()] = float(val2)
+            except:
+                pass
+    
+    
     params_path = cwd + "/paramfiles/" + params_fname
     print("Running CAMB on", params_path)
     output = subprocess.check_output(["./camb", params_path]).decode(sys.stdout.encoding)
@@ -100,7 +136,12 @@ def run_camb(params_fname, camb_exec_dir):
         # Special cases: sigma8 and tau_recomb
         if "sigma8" in line:
             s8line = line[line.find('sigma8'):]  # Only get sigma8 part of string
-            vals['sigma8'] = float(re.findall(r'\b\d+.\d+\b', s8line)[0])
+            print('\n\n')
+            print(re.findall(r'\b\d+.\d+\b', s8line))
+            print(s8line)
+            print('\n\n')
+            match_number = re.compile('-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?')
+            vals['sigma8'] = float(re.findall(match_number, s8line)[1])
         elif "tau_recomb" in line:
             tau = re.findall(r'\b\d+.\d+\b', line)
             vals['tau_recomb/Mpc'] = float(tau[0])
@@ -114,6 +155,8 @@ def run_camb(params_fname, camb_exec_dir):
                 vals[key.strip()] = float(val)
             except:
                 pass
+    
+
 
     # Change back to the original directory
     os.chdir(cwd)

@@ -41,6 +41,7 @@ def Cl_signal(ell, z, z_min, z_max, cosmo, cachefile, analysis_specifications):
     cachefile: name of the output from axionCAMB
     analysis_specifications: e.g. noise_expression, ...
     '''
+    z=0.0
     assert z == cosmo['z'], '''z in cosmo dictionary does not agree with z passed to this function.'''
     # Hubble value H(z) in (km * h)/(s * Mpc)
     HH = hubble_value(z=z, H0=cosmo['h'] * 100, om_m=get_omega_M(cosmo=cosmo)) / cosmo['h']
@@ -54,6 +55,7 @@ def Cl_signal(ell, z, z_min, z_max, cosmo, cachefile, analysis_specifications):
                                         cachefile=cachefile,
                                         force=True, force_load=False)
     # Get hydrogen power spectrum P_HI = P_1-halo + P_2-halo in (Mpc/h)^3
+
     P_HI = hm.hydrogen_powerspectrum(k_arr=k, z=z, powerspec_dic=powerspec_dic, cosmo=cosmo,
                                      analysis_specifications=analysis_specifications, output_opt='full')
     # Prefactor in (h/Mpc)^3, C is speed of light in km/s
@@ -187,6 +189,8 @@ def Nl_noise(ell, z_min, z_max, expt, cosmo, analysis_specifications):
         elif analysis_specifications['noise'] == 'pessimistic':
             # the more pessimistic scenario (arXiv:1907.00071) as in Bull et al. (2015)
             noise = Tsys ** 2 * FOV * expt['Sarea'] / (npol * dnu_bin * expt['ttot'] * n_u * Tb ** 2)
+        elif analysis_specifications['noise'] == 'knox':
+                noise = (sigma2_pix / Tb ** 2) * Wl * expt['Sarea']
         else:
             print('\tNl_noise(): Unknown noise expression in \'interferometric\' given. Abort.')
             raise IOError
@@ -212,8 +216,7 @@ def deriv_wrapper(ell_arr, zmin, zmax, cosmo, analysis_specifications, deriv_opt
                   Delta_As=1.0e-13,
                   Delta_ns=0.0005,
                   Delta_vc0=0.01,
-                  Delta_beta=0.003,
-                  Delta_alpha = 0.001):
+                  Delta_beta=0.003):
     '''
     Returns the numerically calculated derivative of C_ell wrt to some model parameter
     (units depending on model parameter).
@@ -307,15 +310,6 @@ def deriv_wrapper(ell_arr, zmin, zmax, cosmo, analysis_specifications, deriv_opt
         cosmo_betaminus['HI_halo_formula_args']['beta'] -= Delta_beta
         return return_derivative(cosmo_minus=cosmo_betaminus, cosmo_plus=cosmo_betaplus,
                                  cachefile_minus=cachefile_fid, cachefile_plus=cachefile_fid, Delta=Delta_beta)
-    elif deriv_opt == 'alpha':
-        cosmo_alphaplus = copy.deepcopy(cosmo)
-        cosmo_alphaminus = copy.deepcopy(cosmo)
-        cosmo_alphaplus['alpha_ax'] += Delta_alpha
-        cosmo_alphaminus['alpha_ax'] -= Delta_alpha
-        cachefile_plus = file_base + 'alphaplus_Delta{}_z{}.npy'.format(Delta_alpha, z)
-        cachefile_minus = file_base + 'alphaminus_Delta{}_z{}.npy'.format(Delta_alpha, z)
-        return return_derivative(cosmo_minus=cosmo_alphaminus, cosmo_plus=cosmo_alphaplus,
-                                 cachefile_minus=cachefile_minus, cachefile_plus=cachefile_plus, Delta=Delta_alpha)
     else:
         print(
             'deriv_wrapper_numerically(): You specified a derivative option %r, which is not yet implemented (or it is a typo?).' % deriv_opt)
@@ -345,72 +339,9 @@ def fisher_integrands(ell_arr, zmin, zmax, cosmo, expt, cachefile, analysis_spec
     Cl, powerspec_dic, k, P_HI = Cl_signal(ell_arr, z=0.5 * (zmin + zmax), z_min=zmin, z_max=zmax, cosmo=cosmo, cachefile=cachefile,
                    analysis_specifications=analysis_specifications)
 
-    Nl = Nl_noise(ell_arr, z_min=zmin, z_max=zmax, expt=expt, cosmo=cosmo,
-                  analysis_specifications=analysis_specifications)
-
-    # Calculate sky fraction
-    f_sky = expt['Sarea'] / (4 * np.pi)
-    DeltaCl_squared = 2.0 / ((2.0 * ell_arr + 1.0) * f_sky) * (Cl + Nl) ** 2
-
-    print('fisher_integrands(): Calculating derivative wrt to **As** numerically...')
-    deriv_As_num, delta_As = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                           analysis_specifications=analysis_specifications, cosmo=cosmo,
-                                           deriv_opt='As', cachefile_fid=cachefile)
-    print('fisher_integrands(): Calculating derivative wrt to **ns** numerically...')
-    deriv_ns_num, delta_ns = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                           analysis_specifications=analysis_specifications, cosmo=cosmo,
-                                           deriv_opt='ns', cachefile_fid=cachefile)
-    print('fisher_integrands(): Calculating derivative wrt to **omega_d** numerically...')
-    deriv_d, delta_d = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                     analysis_specifications=analysis_specifications, cosmo=cosmo,
-                                     deriv_opt='omega_d', cachefile_fid=cachefile)
-    print('fisher_integrands(): Calculating derivative wrt to **axion fraction** numerically...')
-    deriv_axfrac, delta_axfrac = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                               analysis_specifications=analysis_specifications, cosmo=cosmo,
-                                               deriv_opt='axfrac', cachefile_fid=cachefile)
-    print('fisher_integrands(): Calculating derivative wrt to **omega_b** numerically...')
-    deriv_b, delta_b = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                     analysis_specifications=analysis_specifications, cosmo=cosmo,
-                                     deriv_opt='omega_b', cachefile_fid=cachefile)
-    print('fisher_integrands(): Calculating derivative wrt to **h** numerically...')
-    deriv_h, delta_h = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                     analysis_specifications=analysis_specifications, cosmo=cosmo,
-                                     deriv_opt='hubble', cachefile_fid=cachefile)
-    '''
-    print('fisher_integrands(): Calculating derivative wrt to **alpha** numerically...')
-    deriv_alpha, delta_alpha = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                     analysis_specifications=analysis_specifications, cosmo=cosmo,
-                                     deriv_opt='alpha', cachefile_fid=cachefile)
-    '''
-    if cosmo['HI_halo_formula'] == 'PRA2017':
-        print('fisher_integrands(): Calculating derivative wrt to **vc0** numerically...')
-        deriv_vc0, delta_vc0 = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                             analysis_specifications=analysis_specifications,
-                                             cosmo=cosmo, deriv_opt='vc0', cachefile_fid=cachefile)
-        print('fisher_integrands(): Calculating derivative wrt to **beta** numerically...')
-        deriv_beta, delta_beta = deriv_wrapper(ell_arr=ell_arr, zmin=zmin, zmax=zmax,
-                                               analysis_specifications=analysis_specifications,
-                                               cosmo=cosmo, deriv_opt='beta', cachefile_fid=cachefile)
-        deriv_list = [deriv_As_num * cosmo['As'],
-                      deriv_ns_num,
-                      deriv_b,
-                      deriv_d,
-                      deriv_axfrac,
-                      deriv_h,
-                      deriv_vc0,
-                      deriv_beta,
-                      ]
-        paramnames = ['ln_As', 'ns', 'omega_b_0', 'omega_d_0', 'axfrac', 'h', 'vc0', 'beta', 'alpha']
-    else:
-        print('fisher_integrands(): You specified a HI halo mass relation which isn\'t implemendet for \
-        calculating the derivatives yet. Will assume fixed HI halo mass relation.')
-        deriv_list = [deriv_As_num * cosmo['As'],
-                      deriv_ns_num,
-                      deriv_b,
-                      deriv_d,
-                      deriv_axfrac,
-                      deriv_h]
-        paramnames = ['ln_As', 'ns', 'omega_b_0', 'omega_d_0', 'axfrac', 'h']
+    DeltaCl_squared = 1
+    deriv_list = []
+    paramnames = ['ln_As', 'ns', 'omega_b_0', 'omega_d_0', 'axfrac', 'h', 'vc0', 'beta']
     return DeltaCl_squared, Cl, deriv_list, paramnames, powerspec_dic, k, P_HI
 
 
@@ -473,7 +404,7 @@ def fisher_Cl(zmin, zmax, cosmo, expt, cachefile, analysis_specifications, surve
     # Get derivative terms for Fisher matrix integrands, then perform the integrals and populate the matrix
     print('Calculate derivative terms for Fisher matrix integrands...')
 
-    ell_arr = np.arange(analysis_specifications['lmin'], analysis_specifications['lmax'] + 1, 1)
+    ell_arr = np.arange(analysis_specifications['lmin'], analysis_specifications['lmax'] + 1, 0.1)
     # Consistency check: Is kmax in axionCAMB set higher than the maximum range which will be tested?
     rr = comoving_distance(z=0.5 * (zmax + zmin), om_m=get_omega_M(cosmo=cosmo))
     if verbos >= 1:
@@ -528,11 +459,12 @@ def load_power_spectrum(cosmo, analysis_specifications, cachefile,
         p['massless_neutrinos'] = 2.046
         p['massive_neutrinos'] = '1'  # "2 1"
         p['nu_mass_eigenstates'] = 1
-    
 
     print("\tload_power_spectrum(): Loading matter P(k)...")
     powerspec_dic = cached_camb_output(p=p, cachefile=cachefile, cosmo=cosmo,
                                        force=force, force_load=force_load)
+    
+
     sigma8_computed = np.sqrt(hm.sigma_R(R=8.0, k_arr=powerspec_dic['k'], PS_arr=powerspec_dic['PS_total'],
                                          scipy_opt=False))
     print('\t\tsigma8 with PS_total from transfer function:\t%f' % sigma8_computed)
@@ -673,7 +605,6 @@ def cached_camb_output(p, cachefile, cosmo,
 
     
     alpha = p['alpha_ax']
-    print('\nALPHA = ', alpha, '\n')
     powerspec_dic['PS_total'] = (1-alpha) * powerspec_dic['PS_total'] + alpha * powerspec_dic2['PS_total']
     powerspec_dic['PS_axion+baryon+CDM'] = (1-alpha) * powerspec_dic['PS_axion+baryon+CDM'] + alpha * powerspec_dic2['PS_axion+baryon+CDM']
     #powerspec_dic['transfer_total'] = (1-alpha) * powerspec_dic['transfer_total'] + alpha * powerspec_dic2['transfer_total']
@@ -683,7 +614,10 @@ def cached_camb_output(p, cachefile, cosmo,
     powerspec_dic['transfer_axion'] = (1-alpha) * powerspec_dic['transfer_axion'] + alpha * powerspec_dic2['transfer_axion']
     powerspec_dic['transfer_axion+baryon+CDM'] = (1-alpha) * powerspec_dic['transfer_axion+baryon+CDM'] + alpha * powerspec_dic2['transfer_axion+baryon+CDM']
 
-    
+
+    #print('HERE: \n\n\n',powerspec_dic2,'\n\n\n', powerspec_dic,'\n\n\n', alpha, '\n\n\n')
+
+
     # Save data to file, adding hash to library
     if verbos >= 1: print(
         '\tcached_camb_output(): Saving powerspec_dictionary to %s including the hash for identification.\n'
@@ -712,7 +646,6 @@ def convert_to_camb(cosmo):
     p['pivot_scalar'] = cosmo['k_piv']
     p['omaxh2'] = get_omega_ax(cosmo=cosmo) * cosmo['h'] ** 2. + 1e-10  # +1e-10 to make sure to have a non-zero value
     p['m_ax'] = 10.0 ** cosmo['ma']
-    #p['axion_isocurvature'] = cosmo['axion_isocurvature']
     p['Hinf'] = cosmo['Hinf']
     p['alpha_ax'] = cosmo['alpha_ax']
     return p
